@@ -50,7 +50,7 @@ module "container_apps" {
 
       ingress = {
         allow_insecure_connections = true
-        external_enabled           = true
+        external_enabled           = false
         target_port                = 9001
         traffic_weight = {
           latest_revision = true
