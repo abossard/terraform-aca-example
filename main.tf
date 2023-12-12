@@ -1,32 +1,55 @@
-resource "random_id" "rg_name" {
-  byte_length = 8
-}
-
-resource "random_id" "env_name" {
-  byte_length = 8
-}
-
-resource "random_id" "container_name" {
+resource "random_id" "salt" {
   byte_length = 4
 }
 
 resource "azurerm_resource_group" "test" {
   location = var.location
-  name     = "example-container-app-${random_id.rg_name.hex}"
+  name     = "${var.project}-${random_id.salt.hex}"
 }
 
 locals {
-  counting_app_name  = "counting-${random_id.container_name.hex}"
-  dashboard_app_name = "dashboard-${random_id.container_name.hex}"
+  counting_app_name  = "counting-${random_id.salt.hex}"
+  dashboard_app_name = "dashboard-${random_id.salt.hex}"
+  http_echo_app_name = "http-echo-${random_id.salt.hex}"
 }
 
 module "container_apps" {
-  source                         = "./aca"
-  resource_group_name            = azurerm_resource_group.test.name
-  location                       = var.location
-  container_app_environment_name = "example-env-${random_id.env_name.hex}"
+  source                                                   = "./aca"
+  resource_group_name                                      = azurerm_resource_group.test.name
+  location                                                 = var.location
+  container_app_environment_name                           = "cae-${var.project}-${random_id.salt.hex}"
   container_app_environment_internal_load_balancer_enabled = null
   container_apps = {
+    http_echo = {
+      name          = local.http_echo_app_name
+      revision_mode = "Single"
+      template = {
+        containers = [
+          {
+            name   = "http-echo"
+            memory = "0.5Gi"
+            cpu    = 0.25
+            image  = "docker.io/mendhak/http-https-echo:latest"
+            env = [
+            ]
+          }
+        ]
+
+      }
+      ingress = {
+        allow_insecure_connections = false
+        target_port                = 8080
+        external_enabled           = true
+
+        traffic_weight = {
+          latest_revision = true
+          percentage      = 100
+        }
+      }
+      identity = {
+        type = "SystemAssigned"
+      }
+    }
     counting = {
       name          = local.counting_app_name
       revision_mode = "Single"
@@ -98,5 +121,5 @@ module "container_apps" {
       }
     },
   }
-  log_analytics_workspace_name = "testlaws"
+  log_analytics_workspace_name = "law-${var.project}-${random_id.salt.hex}"
 }
